@@ -1,0 +1,17 @@
+# Xcode
+DerivedData/
+build/
+
+# SwiftPM
+.swiftpm/
+.packages/
+
+# User settings
+*.xcuserdatad/
+*.xcuserdata/
+
+# Firebase local config
+swapride/GoogleService-Info.plist
+
+# macOS
+.DS_Store
