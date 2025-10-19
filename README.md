@@ -11,6 +11,8 @@ Aplikace pro výměnu aut mezi uživateli (SwiftUI + Firebase). Tento MVP běž�
 
 1) Otevřete projekt v Xcode: `swapride.xcodeproj`
 2) Ujistěte se, že je v targetu přidaný soubor `GoogleService-Info.plist` (v repu je příklad `GoogleService-Info.plist.example`).
+	- Zkopírujte `swapride/GoogleService-Info.plist.example` na `swapride/GoogleService-Info.plist` a doplňte hodnoty z Firebase konzole.
+	- Soubor `GoogleService-Info.plist` je ignorován v `.gitignore` a neměl by být nikdy commitnut do repozitáře.
 3) V Xcode přidejte nové Swift soubory do targetu, pokud je Xcode nepřidal automaticky (Models, Views, ViewModels, AppState).
 4) Zvolte iOS simulátor a Build & Run.
 
@@ -38,3 +40,8 @@ Pozn.: Firebase je inicializovaný (Analytics). Přihlášení a databáze nejso
 
 - Nové soubory je třeba přidat do targetu v Xcode (Build Phases → Compile Sources), pokud je Xcode nepřidal automaticky.
 - Minimální verze iOS a ostatní nastavení řeší `swapride.xcodeproj`. Pokud budete měnit strukturu složek, upravte i projekt.
+
+### Bezpečnost a tajné klíče
+
+- Pokud byl `GoogleService-Info.plist` omylem commitnut, klíče v něm považujte za kompromitované a v Firebase konzoli je zneplatněte/otočte.
+- Používejte pouze `GoogleService-Info.plist.example` v repozitáři a skutečný soubor držte lokálně.

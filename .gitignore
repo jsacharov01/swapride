@@ -12,6 +12,8 @@ build/
 
 # Firebase local config
 swapride/GoogleService-Info.plist
+**/GoogleService-Info.plist
+
 
 # macOS
 .DS_Store
