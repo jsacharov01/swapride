@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerId) {
+      return isSignedIn() && request.auth.uid == ownerId;
+    }
+
+    function isParticipant(fromUserId, toUserId) {
+      return isSignedIn() && (request.auth.uid == fromUserId || request.auth.uid == toUserId);
+    }
+
+    match /cars/{carId} {
+      allow read: if true; // veřejné čtení nabídek aut
+
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid &&
+        validCar(request.resource.data);
+
+      allow update: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid &&
+        request.resource.data.ownerId == resource.data.ownerId && // ownerId neměnný
+        validCar(request.resource.data);
+
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /swapRequests/{reqId} {
+      allow read: if isParticipant(resource.data.fromUserId, resource.data.toUserId);
+
+      allow create: if isSignedIn() &&
+        request.resource.data.fromUserId == request.auth.uid &&
+        validSwap(request.resource.data) &&
+        // offeredCar patří odesílateli
+        get(/databases/$(database)/documents/cars/$(request.resource.data.offeredCarId)).data.ownerId == request.auth.uid &&
+        // toUserId odpovídá vlastníku requestedCar
+        get(/databases/$(database)/documents/cars/$(request.resource.data.requestedCarId)).data.ownerId == request.resource.data.toUserId;
+
+      allow update: if isSignedIn() &&
+        // pouze příjemce může měnit status
+        resource.data.toUserId == request.auth.uid &&
+        // neměnné pole
+        request.resource.data.fromUserId == resource.data.fromUserId &&
+        request.resource.data.toUserId == resource.data.toUserId &&
+        request.resource.data.offeredCarId == resource.data.offeredCarId &&
+        request.resource.data.requestedCarId == resource.data.requestedCarId &&
+        request.resource.data.startDate == resource.data.startDate &&
+        request.resource.data.endDate == resource.data.endDate &&
+        // validace obsahu
+        validSwap(request.resource.data);
+
+      allow delete: if false; // mazání zakázáno (nebo upravte podle potřeby)
+    }
+
+    function validCar(d) {
+      return d.keys().hasOnly(['id','ownerId','title','make','model','year','seats','transmission','fuel','location','allowsPets','isFamilyFriendly','photoURL','description']) &&
+             d.id is string &&
+             d.ownerId is string &&
+             d.title is string && d.title.size() > 0 &&
+             d.make is string && d.make.size() > 0 &&
+             d.model is string && d.model.size() > 0 &&
+             d.year is int && d.year >= 1980 && d.year <= 2100 &&
+             d.seats is int && d.seats >= 2 && d.seats <= 9 &&
+             d.transmission is string &&
+             d.fuel is string &&
+             d.location is string && d.location.size() > 0 &&
+             d.allowsPets is bool &&
+             d.isFamilyFriendly is bool &&
+             (!('photoURL' in d) || d.photoURL is string) &&
+             (!('description' in d) || d.description is string);
+    }
+
+    function validSwap(d) {
+      return d.keys().hasOnly(['id','fromUserId','toUserId','offeredCarId','requestedCarId','startDate','endDate','message','status']) &&
+             d.id is string &&
+             d.fromUserId is string &&
+             d.toUserId is string &&
+             d.offeredCarId is string &&
+             d.requestedCarId is string &&
+             d.startDate is timestamp &&
+             d.endDate is timestamp && d.endDate > d.startDate &&
+             (!('message' in d) || d.message is string) &&
+             d.status is string &&
+             ['Čeká se','Přijato','Odmítnuto','Dokončeno'].hasAny([d.status]);
+    }
+  }
+}

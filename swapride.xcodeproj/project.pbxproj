@@ -12,15 +12,32 @@
 		7A71903E2EA4F91D005A86B1 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7A71903D2EA4F91D005A86B1 /* FirebaseAnalyticsCore */; };
 		7A7190402EA4F91D005A86B1 /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = 7A71903F2EA4F91D005A86B1 /* FirebaseAnalyticsIdentitySupport */; };
 		7A7190422EA4F91D005A86B1 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 7A7190412EA4F91D005A86B1 /* FirebaseAppCheck */; };
+		7A7190662EA5385E005A86B1 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 7A7190652EA5385E005A86B1 /* FirebaseAuth */; };
+		7A7190682EA5385E005A86B1 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7A7190672EA5385E005A86B1 /* FirebaseCore */; };
+		7A71906A2EA5385E005A86B1 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 7A7190692EA5385E005A86B1 /* FirebaseFirestore */; };
+		7A71906C2EA5385E005A86B1 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 7A71906B2EA5385E005A86B1 /* FirebaseStorage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		7A7190282EA4F682005A86B1 /* swapride.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = swapride.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		7A7190752EA541BC005A86B1 /* Exceptions for "swapride" folder in "swapride" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 7A7190272EA4F682005A86B1 /* swapride */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7A71902A2EA4F682005A86B1 /* swapride */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				7A7190752EA541BC005A86B1 /* Exceptions for "swapride" folder in "swapride" target */,
+			);
 			path = swapride;
 			sourceTree = "<group>";
 		};
@@ -32,8 +49,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A7190402EA4F91D005A86B1 /* FirebaseAnalyticsIdentitySupport in Frameworks */,
+				7A7190662EA5385E005A86B1 /* FirebaseAuth in Frameworks */,
+				7A71906C2EA5385E005A86B1 /* FirebaseStorage in Frameworks */,
 				7A71903C2EA4F91D005A86B1 /* FirebaseAnalytics in Frameworks */,
 				7A71903E2EA4F91D005A86B1 /* FirebaseAnalyticsCore in Frameworks */,
+				7A7190682EA5385E005A86B1 /* FirebaseCore in Frameworks */,
+				7A71906A2EA5385E005A86B1 /* FirebaseFirestore in Frameworks */,
 				7A7190422EA4F91D005A86B1 /* FirebaseAppCheck in Frameworks */,
 				7A71903A2EA4F91D005A86B1 /* FirebaseAI in Frameworks */,
 			);
@@ -83,6 +104,10 @@
 				7A71903D2EA4F91D005A86B1 /* FirebaseAnalyticsCore */,
 				7A71903F2EA4F91D005A86B1 /* FirebaseAnalyticsIdentitySupport */,
 				7A7190412EA4F91D005A86B1 /* FirebaseAppCheck */,
+				7A7190652EA5385E005A86B1 /* FirebaseAuth */,
+				7A7190672EA5385E005A86B1 /* FirebaseCore */,
+				7A7190692EA5385E005A86B1 /* FirebaseFirestore */,
+				7A71906B2EA5385E005A86B1 /* FirebaseStorage */,
 			);
 			productName = swapride;
 			productReference = 7A7190282EA4F682005A86B1 /* swapride.app */;
@@ -270,11 +295,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = swapride/swapride.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5BDLPX64AM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = swapride/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Swap Ride";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -303,11 +330,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = swapride/swapride.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5BDLPX64AM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = swapride/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Swap Ride";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -390,6 +419,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7A7190382EA4F87B005A86B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAppCheck;
+		};
+		7A7190652EA5385E005A86B1 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A7190382EA4F87B005A86B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		7A7190672EA5385E005A86B1 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A7190382EA4F87B005A86B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		7A7190692EA5385E005A86B1 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A7190382EA4F87B005A86B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		7A71906B2EA5385E005A86B1 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A7190382EA4F87B005A86B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
