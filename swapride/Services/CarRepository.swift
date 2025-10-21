@@ -11,6 +11,7 @@ import FirebaseFirestore
 protocol CarRepository {
     func listenAll(onChange: @escaping ([Car]) -> Void) -> ListenerRegistration
     func create(_ car: Car) async throws
+    func delete(id: String) async throws
 }
 
 final class FirestoreCarRepository: CarRepository {
@@ -84,6 +85,10 @@ final class FirestoreCarRepository: CarRepository {
         if let photoURL = car.photoURL { data["photoURL"] = photoURL }
         if let description = car.description { data["description"] = description }
         try await collection.document(car.id).setData(data, merge: false)
+    }
+
+    func delete(id: String) async throws {
+        try await collection.document(id).delete()
     }
 }
 // Firestore Codable support

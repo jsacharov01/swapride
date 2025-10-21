@@ -47,7 +47,7 @@ struct ProfileView: View {
             
             Section("Moje auta") {
                 ForEach(appState.carsOfCurrentUser()) { car in
-                    NavigationLink(value: car.id) {
+                    NavigationLink(destination: CarDetailView(car: car)) {
                         VStack(alignment: .leading) {
                             Text(car.title).font(.headline)
                             Text("\(car.make) \(car.model), \(car.year) • \(car.seats) míst")

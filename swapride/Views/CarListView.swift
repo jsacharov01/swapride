@@ -14,14 +14,31 @@ struct CarListView: View {
     }
     
     var body: some View {
-        List {
-            ForEach(filtered) { car in
-                NavigationLink(destination: CarDetailView(car: car)) {
-                    VStack(alignment: .leading) {
-                        Text(car.title).font(.headline)
-                        Text("\(car.make) \(car.model), \(car.year) • \(car.seats) míst • \(car.location)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+        Group {
+            if appState.isLoadingCars {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Načítám auta…")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if filtered.isEmpty {
+                ContentUnavailableView(
+                    "Žádná auta",
+                    systemImage: "car",
+                    description: Text("Zkuste upravit hledání nebo přidejte své auto.")
+                )
+            } else {
+                List {
+                    ForEach(filtered) { car in
+                        NavigationLink(destination: CarDetailView(car: car)) {
+                            VStack(alignment: .leading) {
+                                Text(car.title).font(.headline)
+                                Text("\(car.make) \(car.model), \(car.year) • \(car.seats) míst • \(car.location)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
             }

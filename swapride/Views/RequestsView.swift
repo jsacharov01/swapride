@@ -14,36 +14,53 @@ struct RequestsView: View {
     }
     
     var body: some View {
-        List {
-            Section("Příchozí") {
-                if incoming.isEmpty { Text("Žádné příchozí žádosti") }
-                ForEach(incoming) { req in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(label(for: req)).font(.headline)
-                        Text("\(req.startDate.formatted(date: .abbreviated, time: .omitted)) – \(req.endDate.formatted(date: .abbreviated, time: .omitted))")
-                            .foregroundStyle(.secondary)
-                        if let message = req.message { Text("\u{201E}\(message)\u{201C}") }
-                        HStack {
-                            Button("Přijmout") {
-                                appState.updateRequestStatus(id: req.id, status: .accepted)
+        Group {
+            if appState.isLoadingSwaps {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Načítám žádosti…")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if incoming.isEmpty && outgoing.isEmpty {
+                ContentUnavailableView(
+                    "Žádné žádosti",
+                    systemImage: "arrow.2.squarepath",
+                    description: Text("Až někdo požádá o výměnu, uvidíte to zde.")
+                )
+            } else {
+                List {
+                    Section("Příchozí") {
+                        if incoming.isEmpty { Text("Žádné příchozí žádosti") }
+                        ForEach(incoming) { req in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(label(for: req)).font(.headline)
+                                Text("\(req.startDate.formatted(date: .abbreviated, time: .omitted)) – \(req.endDate.formatted(date: .abbreviated, time: .omitted))")
+                                    .foregroundStyle(.secondary)
+                                if let message = req.message { Text("\u{201E}\(message)\u{201C}") }
+                                HStack {
+                                    Button("Přijmout") {
+                                        appState.updateRequestStatus(id: req.id, status: .accepted)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    
+                                    Button("Odmítnout", role: .destructive) {
+                                        appState.updateRequestStatus(id: req.id, status: .declined)
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
                             }
-                            .buttonStyle(.borderedProminent)
-                            
-                            Button("Odmítnout", role: .destructive) {
-                                appState.updateRequestStatus(id: req.id, status: .declined)
-                            }
-                            .buttonStyle(.bordered)
                         }
                     }
-                }
-            }
-            
-            Section("Odeslané") {
-                if outgoing.isEmpty { Text("Zatím jste nic neodeslali") }
-                ForEach(outgoing) { req in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(label(for: req)).font(.headline)
-                        Text(req.status.rawValue).foregroundStyle(.secondary)
+                    
+                    Section("Odeslané") {
+                        if outgoing.isEmpty { Text("Zatím jste nic neodeslali") }
+                        ForEach(outgoing) { req in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(label(for: req)).font(.headline)
+                                Text(req.status.rawValue).foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
             }

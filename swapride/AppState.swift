@@ -17,6 +17,9 @@ final class AppState: ObservableObject {
     @Published private(set) var cars: [Car] = []
     @Published private(set) var swapRequests: [SwapRequest] = []
     @Published var lastSituation: Situation?
+    // Loading states
+    @Published private(set) var isLoadingCars: Bool = true
+    @Published private(set) var isLoadingSwaps: Bool = true
     
     // Repositories
     private var carRepo: CarRepository
@@ -24,6 +27,8 @@ final class AppState: ObservableObject {
     private var carListener: ListenerRegistration?
     private var incomingListener: ListenerRegistration?
     private var outgoingListener: ListenerRegistration?
+    private var incomingHasLoaded: Bool = false
+    private var outgoingHasLoaded: Bool = false
     
     init(
         carRepo: CarRepository,
@@ -31,7 +36,6 @@ final class AppState: ObservableObject {
     ) {
         self.carRepo = carRepo
         self.swapRepo = swapRepo
-        seed() // seed local initial state before listeners attach
         attachListeners()
     }
 
@@ -42,21 +46,16 @@ final class AppState: ObservableObject {
         )
     }
     
-    private func seed() {
-        let demoCars: [Car] = [
-            .init(id: "car_1", ownerId: "user_1", title: "Škoda Octavia Combi", make: "Škoda", model: "Octavia", year: 2019, seats: 5, transmission: .automatic, fuel: .diesel, location: "Praha", allowsPets: true, isFamilyFriendly: true, photoURL: nil, description: "Praktické rodinné auto."),
-            .init(id: "car_2", ownerId: "user_2", title: "VW Transporter 9 míst", make: "Volkswagen", model: "Transporter", year: 2018, seats: 9, transmission: .manual, fuel: .diesel, location: "Brno", allowsPets: true, isFamilyFriendly: true, photoURL: nil, description: "Ideální na výlety s partou."),
-            .init(id: "car_3", ownerId: "user_3", title: "Mazda MX-5", make: "Mazda", model: "MX-5", year: 2021, seats: 2, transmission: .manual, fuel: .petrol, location: "Ostrava", allowsPets: false, isFamilyFriendly: false, photoURL: nil, description: "Zábava na léto.")
-        ]
-        cars = demoCars
-        swapRequests = []
-    }
+    
     
     private func attachListeners() {
         // Cars
         carListener?.remove()
         carListener = carRepo.listenAll { [weak self] cars in
-            Task { @MainActor in self?.cars = cars }
+            Task { @MainActor in
+                self?.cars = cars
+                self?.isLoadingCars = false
+            }
         }
         // Swaps (incoming/outgoing)
         incomingListener?.remove()
@@ -65,20 +64,34 @@ final class AppState: ObservableObject {
             Task { @MainActor in
                 let outgoing = self?.swapRequests.filter { $0.fromUserId == self?.currentUser.id } ?? []
                 self?.swapRequests = outgoing + reqs
+                self?.incomingHasLoaded = true
+                self?.updateSwapsLoadingState()
             }
         }
         outgoingListener = swapRepo.listenOutgoing(for: currentUser.id) { [weak self] reqs in
             Task { @MainActor in
                 let incoming = self?.swapRequests.filter { $0.toUserId == self?.currentUser.id } ?? []
                 self?.swapRequests = reqs + incoming
+                self?.outgoingHasLoaded = true
+                self?.updateSwapsLoadingState()
             }
         }
+    }
+
+    private func updateSwapsLoadingState() {
+        isLoadingSwaps = !(incomingHasLoaded && outgoingHasLoaded)
     }
     
     // MARK: - Cars
     func addCar(_ car: Car) {
         Task {
             try? await carRepo.create(car)
+        }
+    }
+
+    func deleteCar(id: String) {
+        Task {
+            try? await carRepo.delete(id: id)
         }
     }
     
@@ -96,7 +109,6 @@ final class AppState: ObservableObject {
     
     // MARK: - Situations / Matching
     func matchingCars(for situation: Situation) -> [Car] {
-        lastSituation = situation
         // Basic rules:
         // - seats >= peopleCount
         // - if childrenCount > 0 or tripType == .family => prefer isFamilyFriendly

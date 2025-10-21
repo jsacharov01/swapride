@@ -88,5 +88,9 @@ struct SituationResultsView: View {
                 Text(last.tripType.rawValue).foregroundStyle(.secondary)
             }
         }
+        .onAppear {
+            // Store last situation when the results screen appears
+            appState.lastSituation = situation
+        }
     }
 }

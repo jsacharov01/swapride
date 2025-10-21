@@ -9,6 +9,8 @@ struct CarDetailView: View {
     @State private var endDate: Date = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
     @State private var message: String = ""
     @State private var showConfirm: Bool = false
+    @State private var showDeleteConfirm: Bool = false
+    @Environment(\.dismiss) private var dismiss
     
     var myCars: [Car] {
         appState.carsOfCurrentUser()
@@ -51,6 +53,14 @@ struct CarDetailView: View {
                     Label("Poslat žádost o výměnu", systemImage: "paperplane.fill")
                 }
                 .disabled(!canRequest)
+
+                if car.ownerId == appState.currentUser.id {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Smazat toto auto", systemImage: "trash")
+                    }
+                }
             }
         }
         .navigationTitle(car.title)
@@ -68,6 +78,15 @@ struct CarDetailView: View {
             }
         } message: {
             Text("Příjemce uvidí detaily a může žádost přijmout nebo odmítnout.")
+        }
+        .alert("Smazat auto?", isPresented: $showDeleteConfirm) {
+            Button("Zrušit", role: .cancel) {}
+            Button("Smazat", role: .destructive) {
+                appState.deleteCar(id: car.id)
+                dismiss()
+            }
+        } message: {
+            Text("Tuto akci nelze vrátit zpět.")
         }
     }
 }
