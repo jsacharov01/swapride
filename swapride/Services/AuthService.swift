@@ -8,15 +8,12 @@
 import Foundation
 import Combine
 import FirebaseAuth
-import AuthenticationServices
-import CryptoKit
 import UIKit
 
 @MainActor
 final class AuthService: NSObject, ObservableObject {
     @Published var user: User?
     private var authHandle: AuthStateDidChangeListenerHandle?
-    private var currentNonce: String?
     
     override init() {
         super.init()
@@ -29,25 +26,9 @@ final class AuthService: NSObject, ObservableObject {
         if let h = authHandle { Auth.auth().removeStateDidChangeListener(h) }
     }
     
-    // MARK: - Apple
-    func startSignInWithAppleFlow() {
-        let nonce = randomNonceString()
-        currentNonce = nonce
-        let appleIDProvider = ASAuthorizationAppleIDProvider()
-        let request = appleIDProvider.createRequest()
-        request.requestedScopes = [.fullName, .email]
-        request.nonce = sha256(nonce)
-        let controller = ASAuthorizationController(authorizationRequests: [request])
-        controller.delegate = self
-        controller.presentationContextProvider = self
-        controller.performRequests()
-    }
-    
-    // MARK: - Generic OAuth (Google, Facebook, Microsoft)
-    func signInWithProvider(_ providerID: String, scopes: [String] = [], customParameters: [String: String] = [:], presenting: UIViewController) async throws {
-        let provider = OAuthProvider(providerID: providerID)
-        if !scopes.isEmpty { provider.scopes = scopes }
-        if !customParameters.isEmpty { provider.customParameters = customParameters }
+    // MARK: - Google Sign-In (web-based OAuth via Firebase)
+    func signInWithGoogle(presenting: UIViewController) async throws {
+        let provider = OAuthProvider(providerID: "google.com")
         return try await withCheckedThrowingContinuation { continuation in
             let adapter = AuthUIDelegateAdapter(presenter: presenting)
             provider.getCredentialWith(adapter) { credential, error in
@@ -59,6 +40,34 @@ final class AuthService: NSObject, ObservableObject {
                     if let err = err { continuation.resume(throwing: err) }
                     else { continuation.resume() }
                 }
+            }
+        }
+    }
+
+    // MARK: - Email/Password
+    func signInWithEmail(email: String, password: String) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            Auth.auth().signIn(withEmail: email, password: password) { _, error in
+                if let error = error { continuation.resume(throwing: error) }
+                else { continuation.resume() }
+            }
+        }
+    }
+
+    func createUserWithEmail(email: String, password: String) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            Auth.auth().createUser(withEmail: email, password: password) { _, error in
+                if let error = error { continuation.resume(throwing: error) }
+                else { continuation.resume() }
+            }
+        }
+    }
+
+    func sendPasswordReset(to email: String) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            Auth.auth().sendPasswordReset(withEmail: email) { error in
+                if let error = error { continuation.resume(throwing: error) }
+                else { continuation.resume() }
             }
         }
     }
@@ -96,71 +105,4 @@ final class AuthUIDelegateAdapter: NSObject, AuthUIDelegate {
     }
 }
 
-
-// MARK: - ASAuthorizationControllerDelegate
-extension AuthService: ASAuthorizationControllerDelegate {
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else { return }
-        guard let nonce = currentNonce else { return }
-        guard let appleIDToken = appleIDCredential.identityToken else { return }
-        guard let idTokenString = String(data: appleIDToken, encoding: .utf8) else { return }
-        // FirebaseAuth 12.x: use the new Swift-friendly API for Apple credential
-        let credential = OAuthProvider.appleCredential(
-            withIDToken: idTokenString,
-            rawNonce: nonce,
-            fullName: appleIDCredential.fullName
-        )
-        Auth.auth().signIn(with: credential) { _, _ in }
-    }
-    
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        // No-op, you can publish error state here if needed
-    }
-}
-
-// MARK: - ASAuthorizationControllerPresentationContextProviding
-extension AuthService: ASAuthorizationControllerPresentationContextProviding {
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        if let keyWindow = scenes.compactMap({ $0.windows.first(where: { $0.isKeyWindow }) }).first {
-            return keyWindow
-        }
-        if let anyWindow = scenes.first?.windows.first {
-            return anyWindow
-        }
-        if #available(iOS 26.0, *) {
-            if let scene = scenes.first {
-                return UIWindow(windowScene: scene)
-            }
-            fatalError("No UIWindowScene available to present authorization UI.")
-        } else {
-            // Fallback for < iOS 26 where frame-based initializer is not deprecated
-            return UIWindow(frame: UIScreen.main.bounds)
-        }
-    }
-}
-
-// MARK: - Nonce helpers
-private func sha256(_ input: String) -> String {
-    let inputData = Data(input.utf8)
-    let hashed = SHA256.hash(data: inputData)
-    return hashed.compactMap { String(format: "%02x", $0) }.joined()
-}
-
-private func randomNonceString(length: Int = 32) -> String {
-    precondition(length > 0)
-    let charset: Array<Character> = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
-    var result = ""
-    var remainingLength = length
-
-    while remainingLength > 0 {
-        var randoms = [UInt8](repeating: 0, count: 16)
-        let errorCode = SecRandomCopyBytes(kSecRandomDefault, randoms.count, &randoms)
-        if errorCode != errSecSuccess { fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)") }
-        randoms.forEach { random in
-            if remainingLength == 0 { return }
-            if random < charset.count { result.append(charset[Int(random)]) ; remainingLength -= 1 }
-        }
-    }
-    return result
-}
+// Apple, Microsoft, and Facebook flows removed. Only Google remains.
