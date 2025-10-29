@@ -12,7 +12,14 @@ import FirebaseFirestore
 @MainActor
 final class AppState: ObservableObject {
     // Simulated signed-in user (TODO: replace with Firebase Auth)
-    @Published var currentUser: UserProfile = .init(id: "user_1", displayName: "Jurij", photoURL: nil, rating: 4.9)
+    @Published var currentUser: UserProfile = .init(id: "user_1", displayName: "Jurij", photoURL: nil, rating: 4.9) {
+        didSet {
+            // If the authenticated user changed, reattach swap listeners for the new user id
+            if oldValue.id != currentUser.id {
+                reattachSwapListenersForCurrentUser()
+            }
+        }
+    }
     
     @Published private(set) var cars: [Car] = []
     @Published private(set) var swapRequests: [SwapRequest] = []
@@ -57,25 +64,57 @@ final class AppState: ObservableObject {
                 self?.isLoadingCars = false
             }
         }
-        // Swaps (incoming/outgoing)
+        // Swaps (incoming/outgoing) for current user
+        attachSwapListeners(for: currentUser.id)
+    }
+
+    private func reattachSwapListenersForCurrentUser() {
+        // Reset loading state and listeners when user changes
         incomingListener?.remove()
         outgoingListener?.remove()
-        incomingListener = swapRepo.listenIncoming(for: currentUser.id) { [weak self] reqs in
+        incomingHasLoaded = false
+        outgoingHasLoaded = false
+        isLoadingSwaps = true
+        // Clear existing requests to avoid mixing users' data
+        swapRequests = []
+        attachSwapListeners(for: currentUser.id)
+    }
+
+    private func attachSwapListeners(for userId: String) {
+        // Swaps (incoming)
+        incomingListener?.remove()
+        incomingListener = swapRepo.listenIncoming(for: userId) { [weak self] reqs in
             Task { @MainActor in
-                let outgoing = self?.swapRequests.filter { $0.fromUserId == self?.currentUser.id } ?? []
-                self?.swapRequests = outgoing + reqs
-                self?.incomingHasLoaded = true
-                self?.updateSwapsLoadingState()
+                guard let self = self else { return }
+                let outgoing = self.swapRequests.filter { $0.fromUserId == self.currentUser.id }
+                self.swapRequests = self.mergeUniqueById(outgoing + reqs)
+                self.incomingHasLoaded = true
+                self.updateSwapsLoadingState()
             }
         }
-        outgoingListener = swapRepo.listenOutgoing(for: currentUser.id) { [weak self] reqs in
+        // Swaps (outgoing)
+        outgoingListener?.remove()
+        outgoingListener = swapRepo.listenOutgoing(for: userId) { [weak self] reqs in
             Task { @MainActor in
-                let incoming = self?.swapRequests.filter { $0.toUserId == self?.currentUser.id } ?? []
-                self?.swapRequests = reqs + incoming
-                self?.outgoingHasLoaded = true
-                self?.updateSwapsLoadingState()
+                guard let self = self else { return }
+                let incoming = self.swapRequests.filter { $0.toUserId == self.currentUser.id }
+                self.swapRequests = self.mergeUniqueById(reqs + incoming)
+                self.outgoingHasLoaded = true
+                self.updateSwapsLoadingState()
             }
         }
+    }
+
+    private func mergeUniqueById(_ items: [SwapRequest]) -> [SwapRequest] {
+        var seen: Set<String> = []
+        var result: [SwapRequest] = []
+        for it in items {
+            if !seen.contains(it.id) {
+                seen.insert(it.id)
+                result.append(it)
+            }
+        }
+        return result
     }
 
     private func updateSwapsLoadingState() {
