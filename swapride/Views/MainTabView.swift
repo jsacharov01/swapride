@@ -4,18 +4,22 @@ struct MainTabView: View {
     @EnvironmentObject var appState: AppState
     
     var body: some View {
-        TabView {
+        TabView(selection: $appState.selectedTab) {
             NavigationStack { CreateSituationView() }
                 .tabItem { Label("Situace", systemImage: "list.bullet.rectangle.portrait") }
+                .tag(MainTab.situations)
             
             NavigationStack { CarListView() }
                 .tabItem { Label("Auta", systemImage: "car.fill") }
+                .tag(MainTab.cars)
             
             NavigationStack { RequestsView() }
                 .tabItem { Label("Žádosti", systemImage: "arrow.2.squarepath") }
+                .tag(MainTab.requests)
             
             NavigationStack { ProfileView() }
                 .tabItem { Label("Profil", systemImage: "person.crop.circle") }
+                .tag(MainTab.profile)
         }
     }
 }

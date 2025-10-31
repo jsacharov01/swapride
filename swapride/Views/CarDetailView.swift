@@ -12,9 +12,13 @@ struct CarDetailView: View {
     @State private var showDeleteConfirm: Bool = false
     @State private var isPerformingAction: Bool = false
     @State private var showRequestSent: Bool = false
+    @State private var showRequestFailed: Bool = false
+    @State private var requestErrorMessage: String = "Žádost se nepodařilo odeslat. Zkuste to prosím znovu."
     @State private var showValidationAlert: Bool = false
     @State private var validationMessage: String = ""
     @State private var attemptedSubmit: Bool = false
+    @State private var showPermissionTip: Bool = false
+    // Date field sheets handled inside reusable components
     @Environment(\.dismiss) private var dismiss
     
     var myCars: [Car] {
@@ -23,6 +27,7 @@ struct CarDetailView: View {
     
     private var isOwner: Bool { car.ownerId == appState.currentUser.id }
     private func startOfDay(_ date: Date) -> Date { Calendar.current.startOfDay(for: date) }
+    private var today: Date { startOfDay(Date()) }
     private var minEndDate: Date { startOfDay(startDate) }
     private var hasInvalidDates: Bool { startOfDay(endDate) < startOfDay(startDate) }
 
@@ -81,8 +86,8 @@ struct CarDetailView: View {
                                 .font(.footnote)
                                 .foregroundStyle(attemptedSubmit ? .red : .secondary)
                         }
-                        DatePicker("Od", selection: $startDate, displayedComponents: .date)
-                        DatePicker("Do", selection: $endDate, in: minEndDate..., displayedComponents: .date)
+                        DateField(title: "Od", date: $startDate, minDate: today)
+                        DateField(title: "Do", date: $endDate, minDate: minEndDate)
                         if attemptedSubmit && hasInvalidDates {
                             Text("Koncové datum musí být stejné nebo pozdější než počáteční.")
                                 .font(.footnote)
@@ -116,26 +121,53 @@ struct CarDetailView: View {
                     .tint(canRequest ? .accentColor : .gray)
                     .opacity(isPerformingAction ? 0.6 : 1)
                     .disabled(isPerformingAction)
+
+                    if showPermissionTip {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Tip", systemImage: "info.circle")
+                                .font(.footnote.weight(.semibold))
+                            Text("Nabízené auto musí patřit vašemu účtu a koncové datum nesmí být dřívější než počáteční. Stejný den je v pořádku.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             }
         }
         .navigationTitle(car.title)
         .navigationBarTitleDisplayMode(.inline)
+    // date selection handled via DateField sheets
         .alert("Odeslat žádost?", isPresented: $showConfirm) {
             Button("Zrušit", role: .cancel) {}
             Button("Odeslat", role: .none) {
                 guard let myCarId else { return }
                 isPerformingAction = true
-                appState.createSwapRequest(
-                    offeredCarId: myCarId,
-                    requestedCarId: car.id,
-                    startDate: startDate,
-                    endDate: endDate,
-                    message: message.isEmpty ? nil : message
-                )
-                // Optimistic feedback since repository is fire-and-forget
-                showRequestSent = true
-                isPerformingAction = false
+                Task { @MainActor in
+                    do {
+                        try await appState.createSwapRequest(
+                            offeredCarId: myCarId,
+                            requestedCarId: car.id,
+                            startDate: startDate,
+                            endDate: endDate,
+                            message: message.isEmpty ? nil : message,
+                            toUserId: car.ownerId
+                        )
+                        showRequestSent = true
+                    } catch {
+                        // Připrav uživatelsky přívětivou zprávu
+                        let nsErr = error as NSError
+                        if nsErr.domain == "FIRFirestoreErrorDomain", nsErr.code == 7 {
+                            requestErrorMessage = "Chybí oprávnění pro odeslání žádosti. Zkontrolujte prosím, že nabízíte vlastní auto a termíny jsou platné."
+                            showPermissionTip = true
+                        } else {
+                            requestErrorMessage = "Žádost se nepodařilo odeslat. Zkuste to prosím znovu."
+                            showPermissionTip = false
+                        }
+                        showRequestFailed = true
+                    }
+                    isPerformingAction = false
+                }
             }
         } message: {
             Text("Příjemce uvidí detaily a může žádost přijmout nebo odmítnout.")
@@ -157,9 +189,20 @@ struct CarDetailView: View {
             Text(validationMessage)
         }
         .alert("Žádost odeslána", isPresented: $showRequestSent) {
-            Button("OK", role: .cancel) {}
+            Button("OK", role: .cancel) {
+                // Po potvrzení přesměruj na seznam žádostí a zavři detail auta
+                appState.selectedTab = .requests
+                dismiss()
+            }
         } message: {
             Text("Vaše žádost byla odeslána adresátovi.")
+        }
+        .alert("Odeslání se nezdařilo", isPresented: $showRequestFailed) {
+            Button("OK", role: .cancel) {
+                // Zůstaň na obrazovce a pokračuj v editaci žádosti
+            }
+        } message: {
+            Text(requestErrorMessage)
         }
         .onReceive(appState.$cars) { _ in
             // If exactly one car is available later, preselect it
@@ -186,6 +229,13 @@ struct CarDetailView: View {
             if startOfDay(endDate) < startOfDay(newStart) {
                 endDate = startOfDay(newStart)
             }
+            showPermissionTip = false
+        }
+        .onChange(of: endDate) { _, _ in
+            showPermissionTip = false
+        }
+        .onChange(of: myCarId) { _, _ in
+            showPermissionTip = false
         }
     }
 }

@@ -82,7 +82,7 @@ service cloud.firestore {
              d.offeredCarId is string &&
              d.requestedCarId is string &&
              d.startDate is timestamp &&
-             d.endDate is timestamp && d.endDate > d.startDate &&
+        d.endDate is timestamp && d.endDate >= d.startDate &&
              (!('message' in d) || d.message is string) &&
              d.status is string &&
              ['Čeká se','Přijato','Odmítnuto','Dokončeno'].hasAny([d.status]);

@@ -9,8 +9,11 @@ struct CreateSituationView: View {
     @State private var startDate: Date = Date()
     @State private var endDate: Date = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
     @State private var tripType: TripType = .friends
+    private var today: Date { Calendar.current.startOfDay(for: Date()) }
+    private func startOfDay(_ d: Date) -> Date { Calendar.current.startOfDay(for: d) }
     
-    var isValid: Bool { !destination.isEmpty && startDate < endDate && peopleCount >= 1 }
+    // Allow same-day search: end >= start (compare by day)
+    var isValid: Bool { !destination.isEmpty && startOfDay(startDate) <= startOfDay(endDate) && peopleCount >= 1 }
     
     var body: some View {
         Form {
@@ -22,8 +25,8 @@ struct CreateSituationView: View {
             }
             
             Section("Termín") {
-                DatePicker("Od", selection: $startDate, displayedComponents: .date)
-                DatePicker("Do", selection: $endDate, in: startDate..., displayedComponents: .date)
+                DateField(title: "Od", date: $startDate, minDate: today)
+                DateField(title: "Do", date: $endDate, minDate: startOfDay(startDate))
             }
             
             Section("Typ výletu") {
@@ -53,6 +56,12 @@ struct CreateSituationView: View {
             }
         }
         .navigationTitle("Moje situace")
+        .onChange(of: startDate) { newStart in
+            // If new start day is after current end day, snap end to the same day
+            if startOfDay(newStart) > startOfDay(endDate) {
+                endDate = newStart
+            }
+        }
     }
 }
 

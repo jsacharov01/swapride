@@ -8,9 +8,20 @@
 import Foundation
 import Combine
 import FirebaseFirestore
+import SwiftUI
+
+// Hlavní záložky aplikace pro programové přepínání
+enum MainTab: Hashable {
+    case situations
+    case cars
+    case requests
+    case profile
+}
 
 @MainActor
 final class AppState: ObservableObject {
+    // Vybraná záložka v TabView (pro navigaci po akcích)
+    @Published var selectedTab: MainTab = .situations
     // Simulated signed-in user (TODO: replace with Firebase Auth)
     @Published var currentUser: UserProfile = .init(id: "user_1", displayName: "Jurij", photoURL: nil, rating: 4.9) {
         didSet {
@@ -182,21 +193,38 @@ final class AppState: ObservableObject {
     }
     
     // MARK: - Swaps
-    func createSwapRequest(offeredCarId: String, requestedCarId: String, startDate: Date, endDate: Date, message: String?) {
-        let toUserId = car(by: requestedCarId)?.ownerId ?? ""
+    @discardableResult
+    func createSwapRequest(offeredCarId: String, requestedCarId: String, startDate: Date, endDate: Date, message: String?, toUserId explicitToUserId: String? = nil) async throws {
+        // Robustně urči příjemce: preferuj explicitně předaného vlastníka auta, jinak dohledáním v AppState
+        let toUserId = explicitToUserId ?? car(by: requestedCarId)?.ownerId ?? ""
+        // Normalizuj datumy na začátek dne, aby prošly pravidly (end >= start) i při výběru stejné dne
+        let cal = Calendar.current
+        let normalizedStart = cal.startOfDay(for: startDate)
+        let tentativeEnd = cal.startOfDay(for: endDate)
+        let normalizedEnd = max(tentativeEnd, normalizedStart)
         let request = SwapRequest(
             id: UUID().uuidString,
             fromUserId: currentUser.id,
             toUserId: toUserId,
             offeredCarId: offeredCarId,
             requestedCarId: requestedCarId,
-            startDate: startDate,
-            endDate: endDate,
+            startDate: normalizedStart,
+            endDate: normalizedEnd,
             message: message,
             status: .pending
         )
-        Task {
-            try? await swapRepo.create(request)
+        // Optimisticky přidej do lokálního stavu, aby se žádost okamžitě ukázala v "Odeslané"
+        // Serverový listener ji následně dorovná (mergeUniqueById zabrání duplicitám)
+        swapRequests = mergeUniqueById([request] + swapRequests)
+        do {
+            try await swapRepo.create(request)
+        } catch {
+            // Vrátit optimistickou změnu, pokud zápis selhal (např. kvůli pravidlům)
+            swapRequests.removeAll { $0.id == request.id }
+            #if DEBUG
+            print("[Swap] Create failed: \(error)")
+            #endif
+            throw error
         }
     }
     
