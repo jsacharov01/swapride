@@ -56,7 +56,7 @@ struct CreateSituationView: View {
             }
         }
         .navigationTitle("Moje situace")
-        .onChange(of: startDate) { newStart in
+        .onChange(of: startDate) { _, newStart in
             // If new start day is after current end day, snap end to the same day
             if startOfDay(newStart) > startOfDay(endDate) {
                 endDate = newStart
