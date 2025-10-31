@@ -10,16 +10,41 @@ struct CarDetailView: View {
     @State private var message: String = ""
     @State private var showConfirm: Bool = false
     @State private var showDeleteConfirm: Bool = false
+    @State private var isPerformingAction: Bool = false
+    @State private var showRequestSent: Bool = false
+    @State private var showValidationAlert: Bool = false
+    @State private var validationMessage: String = ""
+    @State private var attemptedSubmit: Bool = false
     @Environment(\.dismiss) private var dismiss
     
     var myCars: [Car] {
         appState.carsOfCurrentUser()
     }
     
+    private var isOwner: Bool { car.ownerId == appState.currentUser.id }
+    private func startOfDay(_ date: Date) -> Date { Calendar.current.startOfDay(for: date) }
+    private var minEndDate: Date { startOfDay(startDate) }
+    private var hasInvalidDates: Bool { startOfDay(endDate) < startOfDay(startDate) }
+
+    private func validationError() -> String? {
+        if isOwner { return nil } // request UI hidden for owners anyway
+        if myCars.isEmpty {
+            return "Nejprve přidejte své auto, abyste mohli poslat žádost."
+        }
+        guard let myCarId, !myCarId.isEmpty else {
+            return "Vyberte své auto pro výměnu."
+        }
+        if hasInvalidDates {
+            return "Koncové datum musí být stejné nebo pozdější než počáteční."
+        }
+        return nil
+    }
+    
     var canRequest: Bool {
-        if car.ownerId == appState.currentUser.id { return false }
+        if isOwner { return false }
         guard let myCarId else { return false }
-        return !myCarId.isEmpty && startDate < endDate
+    // Allow same-day swaps as valid (end >= start)
+    return !myCarId.isEmpty && startOfDay(startDate) <= startOfDay(endDate)
     }
     
     var body: some View {
@@ -34,40 +59,73 @@ struct CarDetailView: View {
                 }
             }
             
-            Section("Nabídnout k výměně") {
-                Picker("Moje auto", selection: $myCarId) {
-                    Text("Vyberte auto").tag(Optional<String>.none)
-                    ForEach(myCars) { c in
-                        Text(c.title).tag(Optional<String>(c.id))
+            if !isOwner {
+                Section("Nabídnout k výměně") {
+                    if myCars.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Nemáte přidané žádné auto.")
+                                .foregroundStyle(.secondary)
+                            NavigationLink("Přidat auto") {
+                                CreateListingView()
+                            }
+                        }
+                    } else {
+                        Picker("Moje auto", selection: $myCarId) {
+                            Text("Vyberte auto").tag(Optional<String>.none)
+                            ForEach(myCars) { c in
+                                Text(c.title).tag(Optional<String>(c.id))
+                            }
+                        }
+                        if myCarId == nil || (myCarId ?? "").isEmpty {
+                            Text("Vyberte své auto pro výměnu.")
+                                .font(.footnote)
+                                .foregroundStyle(attemptedSubmit ? .red : .secondary)
+                        }
+                        DatePicker("Od", selection: $startDate, displayedComponents: .date)
+                        DatePicker("Do", selection: $endDate, in: minEndDate..., displayedComponents: .date)
+                        if attemptedSubmit && hasInvalidDates {
+                            Text("Koncové datum musí být stejné nebo pozdější než počáteční.")
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                        TextField("Zpráva (volitelné)", text: $message)
                     }
                 }
-                DatePicker("Od", selection: $startDate, displayedComponents: .date)
-                DatePicker("Do", selection: $endDate, in: startDate..., displayedComponents: .date)
-                TextField("Zpráva (volitelné)", text: $message)
             }
             
             Section {
-                Button {
-                    showConfirm = true
-                } label: {
-                    Label("Poslat žádost o výměnu", systemImage: "paperplane.fill")
-                }
-                .disabled(!canRequest)
-
-                if car.ownerId == appState.currentUser.id {
+                if isOwner {
                     Button(role: .destructive) {
                         showDeleteConfirm = true
                     } label: {
                         Label("Smazat toto auto", systemImage: "trash")
                     }
+                } else {
+                    Button {
+                        attemptedSubmit = true
+                        if let error = validationError() {
+                            validationMessage = error
+                            showValidationAlert = true
+                        } else {
+                            showConfirm = true
+                        }
+                    } label: {
+                        Label("Poslat žádost o výměnu", systemImage: "paperplane.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(canRequest ? .accentColor : .gray)
+                    .opacity(isPerformingAction ? 0.6 : 1)
+                    .disabled(isPerformingAction)
                 }
             }
         }
         .navigationTitle(car.title)
+        .navigationBarTitleDisplayMode(.inline)
         .alert("Odeslat žádost?", isPresented: $showConfirm) {
             Button("Zrušit", role: .cancel) {}
             Button("Odeslat", role: .none) {
                 guard let myCarId else { return }
+                isPerformingAction = true
                 appState.createSwapRequest(
                     offeredCarId: myCarId,
                     requestedCarId: car.id,
@@ -75,6 +133,9 @@ struct CarDetailView: View {
                     endDate: endDate,
                     message: message.isEmpty ? nil : message
                 )
+                // Optimistic feedback since repository is fire-and-forget
+                showRequestSent = true
+                isPerformingAction = false
             }
         } message: {
             Text("Příjemce uvidí detaily a může žádost přijmout nebo odmítnout.")
@@ -82,11 +143,49 @@ struct CarDetailView: View {
         .alert("Smazat auto?", isPresented: $showDeleteConfirm) {
             Button("Zrušit", role: .cancel) {}
             Button("Smazat", role: .destructive) {
+                isPerformingAction = true
                 appState.deleteCar(id: car.id)
+                isPerformingAction = false
                 dismiss()
             }
         } message: {
             Text("Tuto akci nelze vrátit zpět.")
+        }
+        .alert("Nelze odeslat žádost", isPresented: $showValidationAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(validationMessage)
+        }
+        .alert("Žádost odeslána", isPresented: $showRequestSent) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Vaše žádost byla odeslána adresátovi.")
+        }
+        .onReceive(appState.$cars) { _ in
+            // If exactly one car is available later, preselect it
+            if myCarId == nil, myCars.count == 1 {
+                myCarId = myCars.first?.id
+            }
+            // If previously selected car is no longer present, clear selection
+            if let sel = myCarId, !myCars.contains(where: { $0.id == sel }) {
+                myCarId = nil
+            }
+        }
+        .onAppear {
+            // Preselect user's only car to reduce friction
+            if myCarId == nil, myCars.count == 1 {
+                myCarId = myCars.first?.id
+            }
+            // Ensure endDate is not before startDate on first show
+            if startOfDay(endDate) < startOfDay(startDate) {
+                endDate = minEndDate
+            }
+        }
+        .onChange(of: startDate) { _, newStart in
+            // Keep endDate in a valid range when start changes; allow same-day
+            if startOfDay(endDate) < startOfDay(newStart) {
+                endDate = startOfDay(newStart)
+            }
         }
     }
 }
