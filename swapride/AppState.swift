@@ -193,7 +193,6 @@ final class AppState: ObservableObject {
     }
     
     // MARK: - Swaps
-    @discardableResult
     func createSwapRequest(offeredCarId: String, requestedCarId: String, startDate: Date, endDate: Date, message: String?, toUserId explicitToUserId: String? = nil) async throws {
         // Robustně urči příjemce: preferuj explicitně předaného vlastníka auta, jinak dohledáním v AppState
         let toUserId = explicitToUserId ?? car(by: requestedCarId)?.ownerId ?? ""
